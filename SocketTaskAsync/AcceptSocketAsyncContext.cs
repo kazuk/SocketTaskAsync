@@ -13,7 +13,14 @@ namespace SocketTaskAsync
 
         private void CompleteAsync(object sender, SocketAsyncEventArgs e)
         {
-            CompletionSource.SetResult(e.AcceptSocket);
+            if (e.SocketError == SocketError.Success)
+            {
+                CompletionSource.SetResult(e.AcceptSocket);
+            }
+            else
+            {
+                CompletionSource.SetException( new AsyncSocketErrorException(SocketError.SocketError));
+            }
         }
 
         internal TaskCompletionSource<Socket> CompletionSource { get; set; }
