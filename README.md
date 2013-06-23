@@ -22,6 +22,6 @@ SocketTaskAsync.Extentions.SocketTaskAsyncExtention から Socket に対する�
 
 AsyncSocketErrorExceptionを作ってそれを投げるようにした。
 
-### TaskComletionSource<void> が作れない
+### void メソッドの結果を示す TaskComletionSource が作れない
 
 作れないので、後続タスクが使いそうな値を返すようにします。最悪思いつかなければ SocketError 値を返します。
