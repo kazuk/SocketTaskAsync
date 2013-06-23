@@ -1,9 +1,6 @@
-Ôªøusing System;
-using System.Collections.Generic;
-using System.Linq;
+using System;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SocketTaskAsync.Extentions
@@ -44,6 +41,13 @@ namespace SocketTaskAsync.Extentions
             return completionSource.Task;
         }
 
+        /// <summary>
+        /// Socket.Connect(EndPoint) Ç…ëŒÇ∑ÇÈ Task Async ëÄçÏÇíÒãüÇµÇ‹Ç∑
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="remoteEp"></param>
+        /// <returns></returns>
+        /// <remarks>Socket.ConnectÇÕvoidÇ≈TaskCompletionSourceÇégÇ§ÇÃÇ…ç¢Ç¡ÇΩÇÃÇ≈SocketÇï‘Ç∑ÇÊÇ§Ç…ÇµÇ‹ÇµÇΩ</remarks>
         public static Task<Socket> ConnectTaskAsync(this Socket socket,EndPoint remoteEp)
         {
             var asyncArgs = new SocketAsyncEventArgs {RemoteEndPoint = remoteEp};
@@ -61,6 +65,20 @@ namespace SocketTaskAsync.Extentions
             if (! socket.ConnectAsync(asyncArgs))
             {
                 asyncArgsOnCompleted(socket, asyncArgs);
+            }
+            return completionSource.Task;
+        }
+
+        public static Task<Socket> ConnectTaskAsync(this Socket socket, ConnectSocketAsyncContext context,
+                                                    EndPoint remoteEp)
+        {
+            var completionSource = new TaskCompletionSource<Socket>();
+            context.CompletionSource = completionSource;
+            var socketAsyncEventArgs = context.EventArgs;
+            socketAsyncEventArgs.RemoteEndPoint = remoteEp;
+            if (!socket.ConnectAsync(socketAsyncEventArgs))
+            {
+                context.CompleteSynclonus(socket);
             }
             return completionSource.Task;
         }

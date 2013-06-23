@@ -41,6 +41,7 @@
   <ItemGroup>
     <Compile Include="AcceptSocketAsyncContext.cs" />
     <Compile Include="AsyncSocketErrorException.cs" />
+    <Compile Include="ConnectSocketAsyncContext.cs" />
     <Compile Include="Extentions\SocketTaskAsyncExtention.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
