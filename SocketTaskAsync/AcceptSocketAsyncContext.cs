@@ -9,6 +9,9 @@ namespace SocketTaskAsync
     public class AcceptSocketAsyncContext
     {
         private readonly SocketAsyncEventArgs _eventArgs = new SocketAsyncEventArgs();
+        /// <summary>
+        /// Accept用 SocketAsyncEventArgs を構築します。
+        /// </summary>
         public AcceptSocketAsyncContext()
         {
             _eventArgs.Completed += CompleteAsync;
@@ -28,6 +31,9 @@ namespace SocketTaskAsync
 
         internal TaskCompletionSource<Socket> CompletionSource { get; set; }
 
+        /// <summary>
+        /// 保持される SocketAsyncEventArgs を取得します。
+        /// </summary>
         public SocketAsyncEventArgs EventArgs
         {
             get { return _eventArgs; }

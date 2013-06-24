@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace SocketTaskAsync.Extentions
 {
+    /// <summary>
+    /// Task Async でソケット操作を行います
+    /// </summary>
     public static class SocketTaskAsyncExtention
     {
         /// <summary>
@@ -80,6 +83,13 @@ namespace SocketTaskAsync.Extentions
             return completionSource.Task;
         }
 
+        /// <summary>
+        /// ConnectSocketAsyncContext を利用して remoteEp への接続を確立します。
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="remoteEp"></param>
+        /// <returns></returns>
         public static Task<Socket> ConnectTaskAsync(this Socket socket, ConnectSocketAsyncContext context,
                                                     EndPoint remoteEp)
         {
@@ -97,17 +107,26 @@ namespace SocketTaskAsync.Extentions
             return completionSource.Task;
         }
 
-        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer, int size)
+        /// <summary>
+        /// Socket.Send( buffer, size ) をTask Async します。
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer,int offset, int count,SocketFlags socketFlags)
         {
             Contract.Requires(socket!=null);
             Contract.Requires(buffer!=null);
-            Contract.Requires(buffer.Length>=size);
+            Contract.Requires(buffer.Length>=count);
 
             var taskCompletionSource = new TaskCompletionSource<int>();
-            var socketAsyncArgs = new SocketAsyncEventArgs();
+            var socketAsyncArgs = new SocketAsyncEventArgs {SocketFlags = socketFlags};
             var socketAsyncArgsOnCompleted = CreateHandler(taskCompletionSource,e => e.BytesTransferred);
             socketAsyncArgs.Completed += socketAsyncArgsOnCompleted;
-            socketAsyncArgs.SetBuffer(buffer, 0, size);
+            socketAsyncArgs.SetBuffer(buffer, offset, count);
 
             if (!socket.SendAsync(socketAsyncArgs))
             {
@@ -116,18 +135,190 @@ namespace SocketTaskAsync.Extentions
             return taskCompletionSource.Task;
         }
 
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer, int offset, int count)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(offset>=0 );
+            Contract.Requires(count>=0);
+            Contract.Requires(buffer.Length>=offset);
+            Contract.Requires(buffer.Length>=offset+count);
+
+            return SendTaskAsync(socket, buffer, offset, count, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket,SendSokectAsyncContext context,  byte[] buffer, int offset, int count)
+        {
+            Contract.Requires(socket != null);
+            Contract.Requires(context!=null);
+            Contract.Requires(buffer != null);
+            Contract.Requires(offset >= 0);
+            Contract.Requires(count >= 0);
+            Contract.Requires(buffer.Length >= offset);
+            Contract.Requires(buffer.Length >= offset + count);
+
+            return SendTaskAsync(socket,context, buffer, offset, count, SocketFlags.None);
+        }
+
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer, int size,SocketFlags socketFlags)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(size>=0);
+            Contract.Requires(buffer.Length>=size);
+
+            return SendTaskAsync(socket, buffer, 0, size, socketFlags);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, SendSokectAsyncContext context, byte[] buffer, int size, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket != null);
+            Contract.Requires(buffer != null);
+            Contract.Requires(size >= 0);
+            Contract.Requires(buffer.Length >= size);
+
+            return SendTaskAsync(socket, buffer, 0, size, socketFlags);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+
+            return SendTaskAsync(socket, buffer, 0, buffer.Length, socketFlags);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, SendSokectAsyncContext context, byte[] buffer, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket != null);
+            Contract.Requires(buffer != null);
+            Contract.Requires(context!=null);
+
+            return SendTaskAsync(socket,context, buffer, 0, buffer.Length, socketFlags);
+        }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, byte[] buffer)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+
+            return SendTaskAsync(socket, buffer, 0, buffer.Length, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(this Socket socket, SendSokectAsyncContext context, byte[] buffer)
+        {
+            Contract.Requires(socket != null);
+            Contract.Requires(buffer != null);
+            Contract.Requires(context!=null);
+
+            return SendTaskAsync(socket,context, buffer, 0, buffer.Length, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// SendSocketAsyncContext を使用して Socket.Send( buffer, size ) を TaskAsync します。
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <returns></returns>
         public static Task<int> SendTaskAsync(this Socket socket, SendSokectAsyncContext context,
                                               byte[] buffer, int size)
         {
             Contract.Requires(socket!=null);
             Contract.Requires(context!=null);
             Contract.Requires(buffer!=null);
+            Contract.Requires(size>=0);
             Contract.Requires(buffer.Length>=size);
+
+            return SendTaskAsync(socket, context, buffer, 0, size, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="context"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> SendTaskAsync(Socket socket, SendSokectAsyncContext context, byte[] buffer, int offset, int count, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket != null);
+            Contract.Requires(context != null);
+            Contract.Requires(buffer != null);
+            Contract.Requires(count >= 0);
+            Contract.Requires(offset>=0);
+            Contract.Requires(buffer.Length >= offset+count);
 
             var completionSource = new TaskCompletionSource<int>();
             context.CompletionSource = completionSource;
             SocketAsyncEventArgs args = context.EventArgs;
-            args.SetBuffer(buffer,0,size);
+            args.SocketFlags = socketFlags;
+            args.SetBuffer(buffer, offset, count);
             if (!socket.SendAsync(args))
             {
                 context.CompletedSynclonus();
@@ -137,6 +328,57 @@ namespace SocketTaskAsync.Extentions
 
         /// <summary>
         /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <param name="socketFlags"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<int> SendToTaskAsync(this Socket socket, byte[] buffer, int size, SocketFlags socketFlags,
+                                                EndPoint remoteEP)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(buffer.Length>=size);
+
+            return SendToTaskAsync(socket, buffer, 0, size, socketFlags, remoteEP);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="socketFlags"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<int> SendToTaskAsync(this Socket socket, byte[] buffer, SocketFlags socketFlags,
+                                                EndPoint remoteEP)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+
+            return SendToTaskAsync(socket, buffer, 0, buffer.Length, socketFlags, remoteEP);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<int> SendToTaskAsync(this Socket socket, byte[] buffer, EndPoint remoteEP)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+
+            return SendToTaskAsync(socket, buffer, 0, buffer.Length, SocketFlags.None, remoteEP);
+        }
+
+        /// <summary>
+        /// Socket.SendTo( buffer, offset, count, socketFlags, remoteEP ) を Task Async 化します。
         /// </summary>
         /// <param name="socket"></param>
         /// <param name="buffer"></param>
@@ -160,6 +402,37 @@ namespace SocketTaskAsync.Extentions
             if (!socket.SendToAsync(socketAsyncArgs))
             {
                 socketAsyncArgsOnCompleted(socket, socketAsyncArgs);
+            }
+            return taskCompletionSource.Task;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> ReceiveTaskAsync(this Socket socket, byte[] buffer, int offset, int count,
+                                                 SocketFlags socketFlags)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(offset>=0);
+            Contract.Requires(count>=0);
+            Contract.Requires(buffer.Length>=offset);
+            Contract.Requires(buffer.Length>=offset+count);
+
+            var taskCompletionSource = new TaskCompletionSource<int>();
+            var socketAsyncArgs = new SocketAsyncEventArgs {SocketFlags = socketFlags};
+            socketAsyncArgs.SetBuffer(buffer,offset,count);
+
+            var onCompleted = CreateHandler(taskCompletionSource, e => e.BytesTransferred);
+            if (!socket.ReceiveAsync(socketAsyncArgs))
+            {
+                onCompleted(socket, socketAsyncArgs);
             }
             return taskCompletionSource.Task;
         }
