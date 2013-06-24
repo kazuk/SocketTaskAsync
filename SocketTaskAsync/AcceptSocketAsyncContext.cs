@@ -3,6 +3,9 @@ using System.Threading.Tasks;
 
 namespace SocketTaskAsync
 {
+    /// <summary>
+    /// Accept ‚É—˜—p‚³‚ê‚é SocketAsyncEventArgs ‚ğ•Û‚µ‚Ü‚·B
+    /// </summary>
     public class AcceptSocketAsyncContext
     {
         private readonly SocketAsyncEventArgs _eventArgs = new SocketAsyncEventArgs();

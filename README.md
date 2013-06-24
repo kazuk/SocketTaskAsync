@@ -25,3 +25,11 @@ AsyncSocketErrorExceptionを作ってそれを投げるようにした。
 ### void メソッドの結果を示す TaskComletionSource が作れない
 
 作れないので、後続タスクが使いそうな値を返すようにします。最悪思いつかなければ SocketError 値を返します。
+
+## undocumented SocketAsync
+
+### SendAsync の転送したバイト数
+
+http://msdn.microsoft.com/ja-jp/library/vstudio/system.net.sockets.socket.sendasync(v=vs.110).aspx には一言もなかったりしますけど
+そのものずばり SocketAsyncEventArgs の BytesTransfered に格納されます。
+

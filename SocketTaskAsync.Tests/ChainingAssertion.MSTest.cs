@@ -1,4 +1,8 @@
-﻿/*--------------------------------------------------------------------------
+﻿/*
+ * warning fix for Code Contracts and ReSharper 
+ *  and some of change for me(kazuk.dll@kazuk.jp)
+ */
+/*--------------------------------------------------------------------------
  * Chaining Assertion
  * ver 1.7.1.0 (Apr. 29th, 2013)
  *
@@ -184,17 +188,21 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Diagnostics.Contracts;
 using System.Dynamic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 
+// ReSharper disable CheckNamespace
 namespace Microsoft.VisualStudio.TestTools.UnitTesting
+// ReSharper restore CheckNamespace
 {
     #region Extensions
 
-    [System.Diagnostics.DebuggerStepThroughAttribute]
+    [DebuggerStepThroughAttribute]
     [ContractVerification(false)]
     public static partial class AssertEx
     {
@@ -216,7 +224,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             var condition = predicate.Compile().Invoke(value);
 
             var paramName = predicate.Parameters.First().Name;
-            string msg = "";
+            string msg;
             try
             {
                 var dumper = new ExpressionDumper<T>(value, predicate.Parameters.Single());
@@ -357,7 +365,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 var formatted = headerMsg + " No exception was thrown" + additionalMsg;
                 throw new AssertFailedException(formatted);
             }
-            else if (!typeof(T).IsInstanceOfType(exception))
+            if (!(exception is T))
             {
                 var formatted = string.Format("{0} Catched:{1}{2}", headerMsg, exception.GetType().Name, additionalMsg);
                 throw new AssertFailedException(formatted);
@@ -371,22 +379,22 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         {
             var exception = Catch<T>(testCode, message);
 
-            if (!typeof(T).Equals(exception.GetType()))
+            if (typeof (T) == exception.GetType())
             {
-                var headerMsg = "Failed Throws<" + typeof(T).Name + ">.";
-                var additionalMsg = string.IsNullOrEmpty(message) ? "" : ", " + message;
-                var formatted = string.Format("{0} Catched:{1}{2}", headerMsg, exception.GetType().Name, additionalMsg);
-                throw new AssertFailedException(formatted);
+                return exception;
             }
 
-            return (T)exception;
+            var headerMsg = "Failed Throws<" + typeof(T).Name + ">.";
+            var additionalMsg = string.IsNullOrEmpty(message) ? "" : ", " + message;
+            var formatted = string.Format("{0} Catched:{1}{2}", headerMsg, exception.GetType().Name, additionalMsg);
+            throw new AssertFailedException(formatted);
         }
 
         /// <summary>expected testCode throws ContractException</summary>
         /// <returns>ContractException</returns>
         public static Exception ThrowsContractException(Action testCode, string message = "")
         {
-            var exception = AssertEx.Catch<Exception>(testCode, message);
+            var exception = Catch<Exception>(testCode, message);
             var type = exception.GetType();
             if (type.Namespace == "System.Diagnostics.Contracts" && type.Name == "ContractException")
             {
@@ -428,18 +436,18 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>EqualityComparison to IComparer Converter for CollectionAssert</summary>
         private class ComparisonComparer<T> : IComparer
         {
-            readonly Func<T, T, bool> comparison;
+            readonly Func<T, T, bool> _comparison;
 
             public ComparisonComparer(Func<T, T, bool> comparison)
             {
-                this.comparison = comparison;
+                _comparison = comparison;
             }
 
             public int Compare(object x, object y)
             {
-                return (comparison != null)
-                    ? comparison((T)x, (T)y) ? 0 : -1
-                    : object.Equals(x, y) ? 0 : -1;
+                return (_comparison != null)
+                    ? _comparison((T)x, (T)y) ? 0 : -1
+                    : Equals(x, y) ? 0 : -1;
             }
         }
 
@@ -461,8 +469,10 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 var prop = typeof(T).GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                 if (prop != null)
                 {
+// ReSharper disable ImplicitlyCapturedClosure
                     GetValue = () => prop.GetValue(target, null);
                     SetValue = value => prop.SetValue(target, value, null);
+// ReSharper restore ImplicitlyCapturedClosure
                     return;
                 }
 
@@ -476,7 +486,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         public static void IsStructuralEqual(this object actual, object expected, string message = "")
         {
             message = (string.IsNullOrEmpty(message) ? "" : ", " + message);
-            if (object.ReferenceEquals(actual, expected)) return;
+            if (ReferenceEquals(actual, expected)) return;
 
             if (actual == null) throw new AssertFailedException("actual is null" + message);
             if (expected == null) throw new AssertFailedException("actual is not null" + message);
@@ -500,7 +510,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         public static void IsNotStructuralEqual(this object actual, object expected, string message = "")
         {
             message = (string.IsNullOrEmpty(message) ? "" : ", " + message);
-            if (object.ReferenceEquals(actual, expected)) throw new AssertFailedException("actual is same reference" + message); ;
+            if (ReferenceEquals(actual, expected)) throw new AssertFailedException("actual is same reference" + message);
 
             if (actual == null) return;
             if (expected == null) return;
@@ -519,6 +529,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         static EqualInfo SequenceEqual(IEnumerable leftEnumerable, IEnumerable rightEnumarable, IEnumerable<string> names)
         {
             var le = leftEnumerable.GetEnumerator();
+            var namesArrary = names as string[] ?? names.ToArray();
             using (le as IDisposable)
             {
                 var re = rightEnumarable.GetEnumerator();
@@ -537,46 +548,47 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
 
                         if (lMove && rMove)
                         {
-                            var result = StructuralEqual(lValue, rValue, names.Concat(new[] { "[" + index + "]" }));
+                            var result = StructuralEqual(lValue, rValue, namesArrary.Concat(new[] { "[" + index + "]" }));
                             if (!result.IsEquals)
                             {
                                 return result;
                             }
                         }
 
-                        if ((lMove == true && rMove == false) || (lMove == false && rMove == true))
+                        if ((lMove && !rMove ) || (!lMove  && rMove))
                         {
-                            return new EqualInfo { IsEquals = false, Left = lValue, Right = rValue, Names = names.Concat(new[] { "[" + index + "]" }) };
+                            return new EqualInfo { IsEquals = false, Left = lValue, Right = rValue, Names = namesArrary.Concat(new[] { "[" + index + "]" }) };
                         }
-                        if (lMove == false && rMove == false) break;
+                        if (lMove == false) break;
                         index++;
                     }
                 }
             }
-            return new EqualInfo { IsEquals = true, Left = leftEnumerable, Right = rightEnumarable, Names = names };
+            return new EqualInfo { IsEquals = true, Left = leftEnumerable, Right = rightEnumarable, Names = namesArrary };
         }
 
         static EqualInfo StructuralEqual(object left, object right, IEnumerable<string> names)
         {
             // type and basic checks
-            if (object.ReferenceEquals(left, right)) return new EqualInfo { IsEquals = true, Left = left, Right = right, Names = names };
-            if (left == null || right == null) return new EqualInfo { IsEquals = false, Left = left, Right = right, Names = names };
+            var nameList = names as string[] ?? names.ToArray() ;
+            if (ReferenceEquals(left, right)) return new EqualInfo { IsEquals = true, Left = left, Right = right, Names = nameList };
+            if (left == null || right == null) return new EqualInfo { IsEquals = false, Left = left, Right = right, Names = nameList };
             var lType = left.GetType();
             var rType = right.GetType();
-            if (lType != rType) return new EqualInfo { IsEquals = false, Left = left, Right = right, Names = names };
+            if (lType != rType) return new EqualInfo { IsEquals = false, Left = left, Right = right, Names = nameList };
 
             var type = left.GetType();
 
             // not object(int, string, etc...)
             if (Type.GetTypeCode(type) != TypeCode.Object)
             {
-                return new EqualInfo { IsEquals = left.Equals(right), Left = left, Right = right, Names = names };
+                return new EqualInfo { IsEquals = left.Equals(right), Left = left, Right = right, Names = nameList };
             }
 
             // is sequence
             if (typeof(IEnumerable).IsAssignableFrom(type))
             {
-                return SequenceEqual((IEnumerable)left, (IEnumerable)right, names);
+                return SequenceEqual((IEnumerable)left, (IEnumerable)right, nameList);
             }
 
             // IEquatable<T>
@@ -584,17 +596,16 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
             if (equatable.IsAssignableFrom(type))
             {
                 var result = (bool)equatable.GetMethod("Equals").Invoke(left, new[] { right });
-                return new EqualInfo { IsEquals = result, Left = left, Right = right, Names = names };
+                return new EqualInfo { IsEquals = result, Left = left, Right = right, Names = nameList };
             }
 
             // is object
             var fields = left.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public);
             var properties = left.GetType().GetProperties(BindingFlags.Instance | BindingFlags.Public).Where(x => x.GetGetMethod(false) != null);
-            var members = fields.Cast<MemberInfo>().Concat(properties);
 
             foreach (dynamic mi in fields.Cast<MemberInfo>().Concat(properties))
             {
-                var concatNames = names.Concat(new[] { (string)mi.Name });
+                var concatNames = nameList.Concat(new[] { (string)mi.Name });
 
                 object lv = mi.GetValue(left);
                 object rv = mi.GetValue(right);
@@ -605,7 +616,7 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 }
             }
 
-            return new EqualInfo { IsEquals = true, Left = left, Right = right, Names = names };
+            return new EqualInfo { IsEquals = true, Left = left, Right = right, Names = nameList };
         }
 
         private class EqualInfo
@@ -628,44 +639,44 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
 
         private class DynamicAccessor<T> : DynamicObject
         {
-            private readonly T target;
-            private static readonly BindingFlags TransparentFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            private readonly T _target;
+            private const BindingFlags TransparentFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
             public DynamicAccessor(T target)
             {
-                this.target = target;
+                _target = target;
             }
 
             public override bool TrySetIndex(SetIndexBinder binder, object[] indexes, object value)
             {
                 try
                 {
-                    typeof(T).InvokeMember("Item", TransparentFlags | BindingFlags.SetProperty, null, target, indexes.Concat(new[] { value }).ToArray());
+                    typeof(T).InvokeMember("Item", TransparentFlags | BindingFlags.SetProperty, null, _target, indexes.Concat(new[] { value }).ToArray());
                     return true;
                 }
-                catch (MissingMethodException) { throw new ArgumentException(string.Format("indexer not found : Type <{0}>", typeof(T).Name)); };
+                catch (MissingMethodException) { throw new ArgumentException(string.Format("indexer not found : Type <{0}>", typeof(T).Name)); }
             }
 
             public override bool TryGetIndex(GetIndexBinder binder, object[] indexes, out object result)
             {
                 try
                 {
-                    result = typeof(T).InvokeMember("Item", TransparentFlags | BindingFlags.GetProperty, null, target, indexes);
+                    result = typeof(T).InvokeMember("Item", TransparentFlags | BindingFlags.GetProperty, null, _target, indexes);
                     return true;
                 }
-                catch (MissingMethodException) { throw new ArgumentException(string.Format("indexer not found : Type <{0}>", typeof(T).Name)); };
+                catch (MissingMethodException) { throw new ArgumentException(string.Format("indexer not found : Type <{0}>", typeof(T).Name)); }
             }
 
             public override bool TrySetMember(SetMemberBinder binder, object value)
             {
-                var accessor = new ReflectAccessor<T>(target, binder.Name);
+                var accessor = new ReflectAccessor<T>(_target, binder.Name);
                 accessor.SetValue(value);
                 return true;
             }
 
             public override bool TryGetMember(GetMemberBinder binder, out object result)
             {
-                var accessor = new ReflectAccessor<T>(target, binder.Name);
+                var accessor = new ReflectAccessor<T>(_target, binder.Name);
                 result = accessor.GetValue();
                 return true;
             }
@@ -675,8 +686,14 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 var csharpBinder = binder.GetType().GetInterface("Microsoft.CSharp.RuntimeBinder.ICSharpInvokeOrInvokeMemberBinder");
                 if (csharpBinder == null) throw new ArgumentException("is not csharp code");
 
-                var typeArgs = (csharpBinder.GetProperty("TypeArguments").GetValue(binder, null) as IList<Type>).ToArray();
-                var parameterTypes = (binder.GetType().GetField("Cache", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(binder) as Dictionary<Type, object>)
+                var types = csharpBinder.GetProperty("TypeArguments").GetValue(binder, null) as IList<Type>;
+                Debug.Assert(types != null, "types != null");
+                var typeArgs = types.ToArray();
+                FieldInfo fieldInfo = binder.GetType().GetField("Cache", BindingFlags.NonPublic | BindingFlags.Instance);
+                Debug.Assert(fieldInfo != null, "fieldInfo != null");
+                var dictionary = fieldInfo.GetValue(binder) as Dictionary<Type, object>;
+                Debug.Assert(dictionary != null, "dictionary != null");
+                var parameterTypes = dictionary
                     .First()
                     .Key
                     .GetGenericArguments()
@@ -684,8 +701,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                     .Take(args.Length)
                     .ToArray();
 
-                var method = MatchMethod(binder.Name, args, typeArgs, parameterTypes);
-                result = method.Invoke(target, args);
+                var method = MatchMethod(binder.Name, typeArgs, parameterTypes);
+                result = method.Invoke(_target, args);
 
                 return true;
             }
@@ -698,7 +715,53 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                     : null;
             }
 
-            private MethodInfo MatchMethod(string methodName, object[] args, Type[] typeArgs, Type[] parameterTypes)
+            private class MethodInfoAndTypeParams
+            {
+                private readonly MethodInfo _methodInfo;
+                private readonly Dictionary<Type, Type> _typeParameters;
+
+                public MethodInfo MethodInfo
+                {
+                    get { return _methodInfo; }
+                }
+
+                public Dictionary<Type, Type> TypeParameters
+                {
+                    get { return _typeParameters; }
+                }
+
+                public MethodInfoAndTypeParams(MethodInfo methodInfo, Dictionary<Type, Type> typeParameters)
+                {
+                    _methodInfo = methodInfo;
+                    _typeParameters = typeParameters;
+                }
+
+                public override string ToString()
+                {
+                    var builder = new StringBuilder();
+                    builder.Append("{ MethodInfo = ");
+                    builder.Append(MethodInfo);
+                    builder.Append(", TypeParameters = ");
+                    builder.Append(TypeParameters);
+                    builder.Append(" }");
+                    return builder.ToString();
+                }
+
+                public override bool Equals(object value)
+                {
+                    var type = value as MethodInfoAndTypeParams;
+                    return (type != null) && EqualityComparer<MethodInfo>.Default.Equals(type.MethodInfo, MethodInfo) && EqualityComparer<Dictionary<Type, Type>>.Default.Equals(type.TypeParameters, TypeParameters);
+                }
+
+                public override int GetHashCode()
+                {
+                    int num = 0x7a2f0b42;
+                    num = (-1521134295*num) + EqualityComparer<MethodInfo>.Default.GetHashCode(MethodInfo);
+                    return (-1521134295*num) + EqualityComparer<Dictionary<Type, Type>>.Default.GetHashCode(TypeParameters);
+                }
+            }
+
+            private MethodInfo MatchMethod(string methodName, ICollection<Type> typeArgs, IEnumerable<Type> parameterTypes)
             {
                 // name match
                 var nameMatched = typeof(T).GetMethods(TransparentFlags)
@@ -708,63 +771,11 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
 
                 // type inference
                 var typedMethods = nameMatched
-                    .Select(mi =>
-                    {
-                        var genericArguments = mi.GetGenericArguments();
-
-                        if (!typeArgs.Any() && !genericArguments.Any()) // non generic method
-                        {
-                            return new
-                            {
-                                MethodInfo = mi,
-                                TypeParameters = default(Dictionary<Type, Type>)
-                            };
-                        }
-                        else if (!typeArgs.Any())
-                        {
-                            var parameterGenericTypes = mi.GetParameters()
-                                .Select(pi => pi.ParameterType)
-                                .Zip(parameterTypes, Tuple.Create)
-                                .GroupBy(a => a.Item1, a => a.Item2)
-                                .Where(g => g.Key.IsGenericParameter)
-                                .Select(g => new { g.Key, Type = g.Aggregate(AssignableBoundType) })
-                                .Where(a => a.Type != null);
-
-                            var typeParams = genericArguments
-                                .GroupJoin(parameterGenericTypes, x => x, x => x.Key, (_, Args) => Args)
-                                .ToArray();
-                            if (!typeParams.All(xs => xs.Any())) return null; // types short
-
-                            return new
-                            {
-                                MethodInfo = mi,
-                                TypeParameters = typeParams
-                                    .Select(xs => xs.First())
-                                    .ToDictionary(a => a.Key, a => a.Type)
-                            };
-                        }
-                        else
-                        {
-                            if (genericArguments.Length != typeArgs.Length) return null;
-
-                            return new
-                            {
-                                MethodInfo = mi,
-                                TypeParameters = genericArguments
-                                    .Zip(typeArgs, Tuple.Create)
-                                    .ToDictionary(t => t.Item1, t => t.Item2)
-                            };
-                        }
-                    })
+                    .Select(mi => GetMethodInfoAndTypeParams(typeArgs, parameterTypes, mi))
                     .Where(a => a != null)
-                    .Where(a => a.MethodInfo
-                        .GetParameters()
-                        .Select(pi => pi.ParameterType)
-                        .SequenceEqual(parameterTypes, new EqualsComparer<Type>((x, y) =>
-                            (x.IsGenericParameter)
-                                ? a.TypeParameters[x].IsAssignableFrom(y)
-                                : x.Equals(y)))
-                    )
+// ReSharper disable ImplicitlyCapturedClosure
+                    .Where(a => IsParametersEqual(parameterTypes, a))
+// ReSharper restore ImplicitlyCapturedClosure
                     .ToArray();
 
                 if (!typedMethods.Any()) throw new ArgumentException(string.Format("\"{0}\" not match arguments : Type <{1}>", methodName, typeof(T).Name));
@@ -789,18 +800,63 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 throw new ArgumentException(string.Format("\"{0}\" ambiguous arguments : Type <{1}>", methodName, typeof(T).Name));
             }
 
+            private MethodInfoAndTypeParams GetMethodInfoAndTypeParams(ICollection<Type> typeArgs, IEnumerable<Type> parameterTypes, MethodInfo mi)
+            {
+                var genericArguments = mi.GetGenericArguments();
+
+                if (!typeArgs.Any() && !genericArguments.Any()) // non generic method
+                {
+                    return new MethodInfoAndTypeParams(mi, default(Dictionary<Type, Type>));
+                }
+                if (!typeArgs.Any())
+                {
+                    var parameterGenericTypes = mi.GetParameters()
+                                                  .Select(pi => pi.ParameterType)
+                                                  .Zip(parameterTypes, Tuple.Create)
+                                                  .GroupBy(a => a.Item1, a => a.Item2)
+                                                  .Where(g => g.Key.IsGenericParameter)
+                                                  .Select(g => new {g.Key, Type = g.Aggregate(AssignableBoundType)})
+                                                  .Where(a => a.Type != null);
+
+                    var typeParams = genericArguments
+                        .GroupJoin(parameterGenericTypes, x => x, x => x.Key, (_, args) => args)
+                        .ToArray();
+                    if (!typeParams.All(xs => xs.Any())) return null; // types short
+
+                    return new MethodInfoAndTypeParams(mi, typeParams
+                                                               .Select(xs => xs.First())
+                                                               .ToDictionary(a => a.Key, a => a.Type));
+                }
+                if (genericArguments.Length != typeArgs.Count) return null;
+
+                return new MethodInfoAndTypeParams(mi, genericArguments
+                                                           .Zip(typeArgs, Tuple.Create)
+                                                           .ToDictionary(t => t.Item1, t => t.Item2));
+            }
+
+            private static bool IsParametersEqual(IEnumerable<Type> parameterTypes, MethodInfoAndTypeParams a)
+            {
+                bool parametersEqual = a.MethodInfo.GetParameters()
+                                        .Select(pi => pi.ParameterType)
+                                        .SequenceEqual(parameterTypes,
+                                                       new EqualsComparer<Type>(
+                                                           (x, y) =>
+                                                           (x.IsGenericParameter) ? a.TypeParameters[x].IsAssignableFrom(y) : x == y));
+                return parametersEqual;
+            }
+
             private class EqualsComparer<TX> : IEqualityComparer<TX>
             {
-                private readonly Func<TX, TX, bool> equals;
+                private readonly Func<TX, TX, bool> _equals;
 
                 public EqualsComparer(Func<TX, TX, bool> equals)
                 {
-                    this.equals = equals;
+                    _equals = equals;
                 }
 
                 public bool Equals(TX x, TX y)
                 {
-                    return equals(x, y);
+                    return _equals(x, y);
                 }
 
                 public int GetHashCode(TX obj)
@@ -816,23 +872,23 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
 
         private class ExpressionDumper<T> : ExpressionVisitor
         {
-            ParameterExpression param;
-            T target;
+            readonly ParameterExpression _param;
+            readonly T _target;
 
             public Dictionary<string, object> Members { get; private set; }
 
             public ExpressionDumper(T target, ParameterExpression param)
             {
-                this.target = target;
-                this.param = param;
-                this.Members = new Dictionary<string, object>();
+                _target = target;
+                _param = param;
+                Members = new Dictionary<string, object>();
             }
 
-            protected override System.Linq.Expressions.Expression VisitMember(MemberExpression node)
+            protected override Expression VisitMember(MemberExpression node)
             {
-                if (node.Expression == param && !Members.ContainsKey(node.Member.Name))
+                if (node.Expression == _param && !Members.ContainsKey(node.Member.Name))
                 {
-                    var accessor = new ReflectAccessor<T>(target, node.Member.Name);
+                    var accessor = new ReflectAccessor<T>(_target, node.Member.Name);
                     Members.Add(node.Member.Name, accessor.GetValue());
                 }
 
@@ -875,6 +931,9 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
     {
         private static IEnumerable<object[]> GetParameters(Type classType, string methodName)
         {
+            Contract.Requires(classType!=null);
+            Contract.Requires(methodName!=null);
+
             var method = classType.GetMethod(methodName);
 
             var testCase = method
@@ -888,9 +947,14 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
                 .SelectMany(x =>
                 {
                     var p = classType.GetProperty(x.SourceName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-                    var val = (p != null)
-                        ? p.GetValue(null, null)
-                        : classType.GetField(x.SourceName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic).GetValue(null);
+                    object val;
+                    if (p != null) val = p.GetValue(null, null);
+                    else
+                    {
+                        var fieldInfo = classType.GetField(x.SourceName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                        Debug.Assert(fieldInfo != null, "fieldInfo != null");
+                        val = fieldInfo.GetValue(null);
+                    }
 
                     return ((object[])val).Cast<object[]>();
                 });
@@ -901,6 +965,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1>(this TestContext context, Action<T1> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -913,6 +979,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2>(this TestContext context, Action<T1, T2> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -926,6 +994,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3>(this TestContext context, Action<T1, T2, T3> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -940,6 +1010,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4>(this TestContext context, Action<T1, T2, T3, T4> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -955,6 +1027,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5>(this TestContext context, Action<T1, T2, T3, T4, T5> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -971,6 +1045,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6>(this TestContext context, Action<T1, T2, T3, T4, T5, T6> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -988,6 +1064,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1006,6 +1084,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1025,6 +1105,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1045,6 +1127,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1066,6 +1150,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1088,6 +1174,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1111,6 +1199,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1135,6 +1225,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1160,6 +1252,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {
@@ -1186,6 +1280,8 @@ namespace Microsoft.VisualStudio.TestTools.UnitTesting
         /// <summary>Run Parameterized Test marked by TestCase Attribute.</summary>
         public static void Run<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16>(this TestContext context, Action<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, T14, T15, T16> assertion)
         {
+            Contract.Requires(context!=null);
+
             var type = Assembly.GetCallingAssembly().GetType(context.FullyQualifiedTestClassName);
             foreach (var parameters in GetParameters(type, context.TestName))
             {

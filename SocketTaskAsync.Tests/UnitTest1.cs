@@ -10,6 +10,9 @@ namespace SocketTaskAsync.Tests
     [TestClass]
     public class UnitTest1
     {
+        /// <summary>
+        /// TaskAsync で Accept 待ちソケットを作成し、そこに connect をするとちゃんとAcceptされる
+        /// </summary>
         [TestMethod]
         public void AcceptAsync()
         {
