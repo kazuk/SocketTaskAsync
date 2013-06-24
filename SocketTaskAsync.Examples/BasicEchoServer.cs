@@ -25,7 +25,6 @@ namespace SocketTaskAsync.Examples
                     acceptSocket.Close();
                 }
             } while (true);
-
 // ReSharper disable FunctionNeverReturns
         }
 // ReSharper restore FunctionNeverReturns

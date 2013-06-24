@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.Contracts;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
@@ -51,6 +52,72 @@ namespace SocketTaskAsync.Extentions
                 context.CompleteSynclonus();
             }
             return completionSource.Task;
+        }
+
+        /// <summary>
+        /// Socket.Connect(string host,int port) Ç Task AsyncÇ≈é¿çsÇµÇ‹Ç∑
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="host"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
+        public static Task<Socket> ConnectTaskAsync(this Socket socket, string host, int port)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(host!=null);
+
+            return ConnectTaskAsync(socket, Dns.GetHostAddresses(host), port);
+        }
+
+        /// <summary>
+        /// Socket.Connect( IPAddress[], port ) ÇTask Async é¿çsÇµÇ‹Ç∑ÅB
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="addresses"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        /// <exception cref="ArgumentException"></exception>
+        public static async Task<Socket> ConnectTaskAsync(this Socket socket, IPAddress[] addresses, int port)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(addresses!=null);
+
+
+            Exception exception =null;
+            foreach (var ipAddress in addresses
+                .Where(ipAddress => socket.AddressFamily == ipAddress.AddressFamily || 
+                    (ipAddress.AddressFamily == AddressFamily.InterNetwork && socket.AddressFamily == AddressFamily.InterNetworkV6)))
+            {
+                try
+                {
+                    var connectedSocket = await ConnectTaskAsync(socket, ipAddress, port);
+                    return connectedSocket;
+                }
+                catch (Exception ex)
+                {
+                    exception = ex;
+                }
+            }
+            if (exception != null)
+            {
+                throw exception;
+            }
+            throw new ArgumentException("valid address not found", "addresses");
+        }
+
+        /// <summary>
+        /// Socket.Connect( IPAddress address, int port )ÇTask AsyncÇµÇ‹Ç∑
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="address"></param>
+        /// <param name="port"></param>
+        /// <returns></returns>
+        public static Task<Socket> ConnectTaskAsync(this Socket socket, IPAddress address, int port)
+        {
+            Contract.Requires(socket!=null);
+
+            return ConnectTaskAsync(socket, new IPEndPoint(address, port));
         }
 
         /// <summary>
@@ -411,6 +478,52 @@ namespace SocketTaskAsync.Extentions
         /// </summary>
         /// <param name="socket"></param>
         /// <param name="buffer"></param>
+        /// <returns></returns>
+        public static Task<int> ReceiveTaskAsync(this Socket socket, byte[] buffer)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+
+            return ReceiveTaskAsync(socket, buffer, 0, buffer.Length, SocketFlags.None);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> ReceiveTaskAsync(this Socket socket, byte[] buffer, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            
+            return ReceiveTaskAsync(socket, buffer, 0, buffer.Length, socketFlags);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <param name="socketFlags"></param>
+        /// <returns></returns>
+        public static Task<int> ReceiveTaskAsync(this Socket socket, byte[] buffer, int size, SocketFlags socketFlags)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(size>=0 );
+            Contract.Requires(buffer.Length>=size);
+            return ReceiveTaskAsync(socket, buffer, 0, size, socketFlags);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
         /// <param name="offset"></param>
         /// <param name="count"></param>
         /// <param name="socketFlags"></param>
@@ -430,11 +543,86 @@ namespace SocketTaskAsync.Extentions
             socketAsyncArgs.SetBuffer(buffer,offset,count);
 
             var onCompleted = CreateHandler(taskCompletionSource, e => e.BytesTransferred);
+            socketAsyncArgs.Completed += onCompleted;
+
             if (!socket.ReceiveAsync(socketAsyncArgs))
             {
                 onCompleted(socket, socketAsyncArgs);
             }
             return taskCompletionSource.Task;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<Tuple<int, EndPoint>> ReceiveFromTaskAsync(this Socket socket, byte[] buffer,
+                                                                      EndPoint remoteEP)
+        {
+            return ReceiveFromTaskAsync(socket, buffer, 0, buffer.Length, SocketFlags.None, remoteEP);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="socketFlags"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<Tuple<int, EndPoint>> ReceiveFromTaskAsync(this Socket socket,byte[] buffer, SocketFlags socketFlags,
+                                                                      EndPoint remoteEP)
+        {
+            return ReceiveFromTaskAsync(socket, buffer, 0, buffer.Length, socketFlags, remoteEP);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="size"></param>
+        /// <param name="socketFlags"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<Tuple<int, EndPoint>> ReceiveFromTaskAsync(this Socket socket, byte[] buffer, int size,
+                                                                      SocketFlags socketFlags, EndPoint remoteEP)
+        {
+            return ReceiveFromTaskAsync(socket, buffer, 0, size, socketFlags, remoteEP);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="socket"></param>
+        /// <param name="buffer"></param>
+        /// <param name="offset"></param>
+        /// <param name="count"></param>
+        /// <param name="socketFlags"></param>
+        /// <param name="remoteEP"></param>
+        /// <returns></returns>
+        public static Task<Tuple<int,EndPoint>> ReceiveFromTaskAsync(this Socket socket, byte[] buffer, int offset, int count,
+                                                     SocketFlags socketFlags, EndPoint remoteEP)
+        {
+            Contract.Requires(socket!=null);
+            Contract.Requires(buffer!=null);
+            Contract.Requires(offset>=0);
+            Contract.Requires(count>=0);
+            Contract.Requires(buffer.Length>=offset+count);
+
+            var taskCompltionSource = new TaskCompletionSource<Tuple<int, EndPoint>>();
+            var socketAsyncArgs = new SocketAsyncEventArgs {SocketFlags = socketFlags, RemoteEndPoint = remoteEP};
+            socketAsyncArgs.SetBuffer(buffer,offset,count);
+
+            var onCompleted = CreateHandler(taskCompltionSource, e => Tuple.Create(e.BytesTransferred, e.RemoteEndPoint));
+            if (!socket.ReceiveFromAsync(socketAsyncArgs))
+            {
+                onCompleted(socket, socketAsyncArgs);
+            }
+            return taskCompltionSource.Task;
         }
 
         private static EventHandler<SocketAsyncEventArgs> CreateHandler<T>(TaskCompletionSource<T> taskCompletionSource, Func<SocketAsyncEventArgs, T> resultSelector)
